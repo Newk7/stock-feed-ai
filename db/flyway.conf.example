@@ -1,0 +1,4 @@
+flyway.url=jdbc:postgresql://localhost:5433/smartwire
+flyway.user=smartwire
+flyway.password=smartwire_dev
+flyway.locations=filesystem:./migrations

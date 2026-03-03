@@ -1,0 +1,11 @@
+services:
+  server:
+    environment:
+      NODE_ENV: development
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:3000
+    volumes:
+      - ./server/src:/app/src
+
+  client:
+    volumes:
+      - ./client/src:/app/src

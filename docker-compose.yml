@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartwire-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smartwire}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartwire_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-smartwire}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartwire}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  flyway:
+    image: flyway/flyway:10
+    container_name: smartwire-flyway
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/flyway/sql
+    command: >
+      -url=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smartwire}
+      -user=${POSTGRES_USER:-smartwire}
+      -password=${POSTGRES_PASSWORD:-smartwire_dev}
+      -locations=filesystem:/flyway/sql
+      migrate
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: smartwire-server
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-smartwire}:${POSTGRES_PASSWORD:-smartwire_dev}@postgres:5432/${POSTGRES_DB:-smartwire}
+      PORT: 3001
+      NODE_ENV: ${NODE_ENV:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:3002}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-agentic-smartwire}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+    ports:
+      - "3002:3001"
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: smartwire-client
+    depends_on:
+      - server
+    environment:
+      VITE_API_URL: http://localhost:3002
+      VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+      VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
+      VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+      VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-}
+      VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+    ports:
+      - "5174:5173"
+
+volumes:
+  postgres-data:
